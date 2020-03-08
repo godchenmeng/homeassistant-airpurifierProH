@@ -215,7 +215,7 @@ SERVICE_TO_METHOD = {
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Perform the setup for Xiaomi air quality monitor."""
+    """Perform the setup for Xiaomi Airpurifier."""
     if DATA_KEY not in hass.data:
         hass.data[DATA_KEY] = {}
 
@@ -351,15 +351,35 @@ class AirPurifierproH(FanEntity):
                 values[prop] = val[0]["value"]
             result = Dict2Obj(values)
             self._state = result["power"]
-            fanLevel = result["fan_level"]
-            if(fanLevel == 0):
-                result["speed"] = "off"
-            if (fanLevel == 1):
-                result["speed"] = "low"
-            if (fanLevel == 2):
-                result["speed"] = "medium"
-            if (fanLevel == 3):
-                result["speed"] = "high"
+            if (result["buzzer"] == 0):
+                result["buzzer"] = "Off"
+            else:
+                result["buzzer"] = "On"
+            if (result["led_brightness"] == 0):
+                result["led_brightness"] = "Light"
+            if (result["led_brightness"] == 1):
+                result["led_brightness"] = "Gleam"
+            if (result["led_brightness"] == 2):
+                result["led_brightness"] = "Off"
+            if (result["mode"] == 0):
+                result["mode"] = "Auto"
+            if (result["mode"] == 1):
+                result["mode"] = "Silent"
+            if (result["mode"] == 2):
+                result["mode"] = "Favorite"
+            if (result["mode"] == 3):
+                result["mode"] = "Manual"
+            if(result["fan_level"] == 0):
+                result["speed"] = result["mode"]
+            if (result["fan_level"] == 1):
+                result["speed"] = "Medium"
+                result["fan_level"] = "Medium"
+            if (result["fan_level"] == 2):
+                result["speed"] = "High"
+                result["fan_level"] = "High"
+            if (result["fan_level"] == 3):
+                result["speed"] = "Strong"
+                result["fan_level"] = "Strong"
             self._state_attrs.update(result)
         except DeviceException:
             _LOGGER.exception('Fail to get_properties from Xiaomi airpurifier pro H')
@@ -370,9 +390,12 @@ class AirPurifierproH(FanEntity):
         """Get the latest data and updates the states."""
         self.parse_data()
 
-    async def async_turn_on(self, **kwargs):
-        """Turn the device on."""
-        result = self._device.send('set_properties', [{**_MAPPING["power"],"value": True}])
+    async def async_turn_on(self, speed: str = None, **kwargs):
+        if speed:
+            result = await self.set_fan_mode(speed)
+        else:
+            """Turn the device on."""
+            result = self._device.send('set_properties', [{**_MAPPING["power"],"value": True}])
         if result:
             self._state = True
 
@@ -427,6 +450,20 @@ class AirPurifierproH(FanEntity):
         if not self._state:
             return
         self._device.send('set_properties', [{**_MAPPING["mode"], "value": mode}])
+
+    async def set_fan_mode(self, type):
+        if type == 'Auto':
+            result = await self.async_set_mode(0)
+        if type == 'Silent':
+            result = await self.async_set_mode(1)
+        if type == 'Favorite':
+            result = await self.async_set_mode(2)
+        if type == 'Medium':
+            result = await self.async_set_fan_level(1)
+        if type == 'High':
+            result = await self.async_set_fan_level(2)
+        if type == 'Strong':
+            result = await self.async_set_fan_level(3)
 
 class Dict2Obj(dict):
     def __init__(self, *args, **kwargs):
